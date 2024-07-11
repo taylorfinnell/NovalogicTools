@@ -37,7 +37,7 @@ namespace Novalogic.PFF
         public byte[] GetContents()
         {
             if ((_version == PffArchive.PffVersion.PFF3 && _entry.Deleted == 0 && _entry.FileOffset != uint.MaxValue) ||
-                _version == PffArchive.PffVersion.PFF2)
+                _version == PffArchive.PffVersion.PFF2 || _version == PffArchive.PffVersion.PFF4)
             {
 
                 var stream = _reader.BaseStream;

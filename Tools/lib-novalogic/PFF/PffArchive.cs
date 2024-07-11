@@ -11,7 +11,7 @@ namespace Novalogic.PFF
     public class PffArchive : IDisposable
     {
         private readonly BinaryReader _bReader;
-        private readonly Header_Pff3_20 _header;
+        private readonly IPffHeaderAbstract _header;
         private List<PffEntry> _cachedEntries;
 
         private PffArchive(FileInfo fileInfo)
@@ -29,7 +29,8 @@ namespace Novalogic.PFF
 
             else if (version == PffVersion.PFF2 && headerSize == 20)
                 _header = reader.ReadBytes(20).ToStruct<Header_Pff3_20>();
-
+            else if (version == PffVersion.PFF4 && headerSize == 20)
+                _header = reader.ReadBytes(20).ToStruct<Header_Pff4_20>();
             else
                 throw new NotImplementedException();
         }
@@ -105,6 +106,16 @@ namespace Novalogic.PFF
                     else
                         throw new NotImplementedException();
                 }
+                else if (_header.Signature == PffVersion.PFF4)
+                {
+                    if (_header.RecordSize == 36)
+                    {
+                        var entry = _bReader.ReadBytes(36).ToStruct<Entry_Pff4_36>();
+                        pffEntry = new PffEntry(_bReader, entry, _header.Signature);
+                    }
+                    else
+                        throw new NotImplementedException();
+                }
                 else
                     throw new NotImplementedException();
 
@@ -127,10 +138,19 @@ namespace Novalogic.PFF
             Byte[] FileName { get; }
         }
 
+        internal interface IPffHeaderAbstract
+        {
+            UInt32 HeaderSize { get; }
+            PffVersion Signature { get; }
+            UInt32 RecordCount { get; }
+            UInt32 RecordSize { get; }
+            UInt32 RecordOffset { get; }
+        }
+
         // ReSharper disable UnassignedGetOnlyAutoProperty
 
         [StructLayout(LayoutKind.Sequential, Size = 20, Pack = 1)]
-        private struct Header_Pff3_20
+        private struct Header_Pff3_20 : IPffHeaderAbstract
         {
             public UInt32 HeaderSize { get; }
             public PffVersion Signature { get; }
@@ -151,10 +171,33 @@ namespace Novalogic.PFF
             public Byte Null { get; }
         }
 
+        [StructLayout(LayoutKind.Sequential, Size = 20, Pack = 1)]
+        private struct Header_Pff4_20 : IPffHeaderAbstract
+        {
+            public UInt32 HeaderSize { get; }
+            public PffVersion Signature { get; }
+            public UInt32 RecordCount { get; }
+            public UInt32 RecordSize { get; }
+            public UInt32 RecordOffset { get; }
+        }
+
+        [StructLayout(LayoutKind.Sequential, Size = 32, Pack = 1)]
+        private struct Entry_Pff4_36 : IPffEntryAbstract
+        {
+            public UInt32 Deleted { get; }
+            public UInt32 FileOffset { get; }
+            public UInt32 FileSize { get; }
+            public UInt32 FileModified { get; }
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 15)] private readonly Byte[] fileName;
+            public Byte[] FileName => fileName;
+            public Byte Null { get; }
+        }
+
         internal enum PffVersion : uint
         {
             PFF2 = 0x32464650, //{'P','F','F','2'}
             PFF3 = 0x33464650, //{'P','F','F','3'}
+            PFF4 = 0x34464650, //{'P','F','F','4'}
         }
         
         // ReSharper restore UnassignedGetOnlyAutoProperty
